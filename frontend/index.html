@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureUPI | Fraud Detection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <!-- Background Elements -->
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-grid"></div>
+
+    <div class="main-container">
+        <header>
+            <div class="logo-wrapper">
+                <span class="logo-icon">🛡️</span>
+                <span class="logo-text">SecureUPI</span>
+            </div>
+            <h1>Fraud Analysis System</h1>
+            <p class="subtitle">Next-Generation AI Transaction Monitoring</p>
+        </header>
+
+        <main>
+            <!-- Mode Switcher -->
+            <div class="mode-switcher">
+                <button class="mode-btn active" id="tabBatch">Batch Upload</button>
+                <button class="mode-btn" id="tabSingle">Single Check</button>
+            </div>
+
+            <!-- Upload Card (Batch Mode) -->
+            <div class="card glass-effect" id="mainCard">
+                <div class="card-content" id="uploadSection">
+                    <div class="upload-area" id="dropZone">
+                        <div class="icon-container">
+                            <svg class="cloud-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path
+                                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </div>
+                        <h3>Upload Transactions</h3>
+                        <p class="upload-hint">Drag & drop your CSV file here or <span class="action-link">Browse
+                                Files</span></p>
+                        <input type="file" id="csvInput" accept=".csv" hidden>
+                    </div>
+
+                    <div id="fileStatus" class="file-status hidden">
+                        <div class="file-icon">📄</div>
+                        <div class="file-details">
+                            <span id="fileName" class="file-name">transactions.csv</span>
+                            <span class="file-size">Ready to Analyze</span>
+                        </div>
+                        <button id="clearFileBtn" class="icon-btn">✕</button>
+                    </div>
+
+                    <button id="uploadBtn" class="primary-btn" disabled>
+                        <span>Analyze Dataset</span>
+                        <div class="shine"></div>
+                        <div class="loader" id="batchLoader"></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Single Check Card -->
+            <div class="card glass-effect hidden" id="singleCard">
+                <div class="card-header">
+                    <h2>Verify Transaction</h2>
+                    <p>Enter details to check for fraud risk instantly.</p>
+                </div>
+                <form id="singleForm" class="single-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Transaction Type</label>
+                            <select id="sf_type" required>
+                                <option value="P2P">P2P</option>
+                                <option value="P2M">P2M</option>
+                                <option value="Bill Payment">Bill Payment</option>
+                                <option value="Recharge">Recharge</option>
+                                <option value="Cashback">Cashback</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount (INR)</label>
+                            <input type="number" id="sf_amount" placeholder="e.g. 5000.00" step="0.01" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Merchant Category</label>
+                            <select id="sf_category" required>
+                                <option value="Grocery">Grocery</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Fashion">Fashion</option>
+                                <option value="Utilities">Utilities</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Dining">Dining</option>
+                                <option value="Entertainment">Entertainment</option>
+                                <option value="Gambling">Gambling</option>
+                                <option value="Crypto">Crypto</option>
+                                <option value="Unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Sender Bank</label>
+                            <select id="sf_sender_bank" required>
+                                <option value="SBI">SBI</option>
+                                <option value="HDFC">HDFC</option>
+                                <option value="ICICI">ICICI</option>
+                                <option value="Axis">Axis</option>
+                                <option value="Paytm Bank">Paytm Bank</option>
+                                <option value="Kotak">Kotak</option>
+                                <option value="PNB">PNB</option>
+                                <option value="Yono">Yono</option>
+                                <option value="Unknown Bank">Other/Unknown</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Receiver Bank</label>
+                            <select id="sf_receiver_bank" required>
+                                <option value="SBI">SBI</option>
+                                <option value="HDFC">HDFC</option>
+                                <option value="ICICI">ICICI</option>
+                                <option value="Axis">Axis</option>
+                                <option value="Paytm Bank">Paytm Bank</option>
+                                <option value="Kotak">Kotak</option>
+                                <option value="PNB">PNB</option>
+                                <option value="Yono">Yono</option>
+                                <option value="Unknown Bank">Other/Unknown</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Device Type</label>
+                            <select id="sf_device" required>
+                                <option value="Android">Android</option>
+                                <option value="iOS">iOS</option>
+                                <option value="Windows">Windows</option>
+                                <option value="Linux">Linux</option>
+                                <option value="Emulator">Emulator</option>
+                                <option value="Unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Network Type</label>
+                            <select id="sf_network" required>
+                                <option value="4G">4G</option>
+                                <option value="5G">5G</option>
+                                <option value="WiFi">WiFi</option>
+                                <option value="VPN">VPN</option>
+                                <option value="Tor">Tor</option>
+                                <option value="Public WiFi">Public WiFi</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="checkFraudBtn" class="primary-btn">
+                        <span>Check Risk</span>
+                        <div class="shine"></div>
+                    </button>
+                </form>
+
+                <!-- Single Result -->
+                <div id="singleResult" class="single-result hidden">
+                    <div class="result-badge" id="resultBadge">Safe</div>
+                    <div class="result-details">
+                        <p>Confidence: <span id="resConfidence">0%</span></p>
+                        <p id="resMessage">Transaction appears legitimate.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section (Hidden initially) -->
+            <div class="card glass-effect hidden" id="batchResultSection">
+                <div class="result-header">
+                    <h2>Analysis Report</h2>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <span class="stat-label">Total</span>
+                            <span class="stat-value" id="statTotal">0</span>
+                        </div>
+                        <div class="stat-box danger">
+                            <span class="stat-label">Fraud Detected</span>
+                            <span class="stat-value" id="statFraud">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="fraudTable">
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Bank</th>
+                                <th>Risk Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="action-footer">
+                    <button id="resetBatchBtn" class="secondary-btn">Upload New File</button>
+                    <button id="exportBtn" class="secondary-btn">Export Report</button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by Advanced Anomaly Detection Models</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env\
+
+transactions.csv
+upi_transactions_2024.csv
