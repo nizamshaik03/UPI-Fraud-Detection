@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
         checkFraudBtn.innerHTML = '<div class="loader" style="display:block; width:20px; height:20px;"></div> Checking...';
 
         try {
-            const response = await fetch('http://127.0.0.1:7012/predict', {
+            const response = await fetch('https://upi-fraud-detection-664u.vercel.app/predict', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
