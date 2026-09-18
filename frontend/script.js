@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('file', selectedFile);
 
         try {
-            const response = await fetch('/upload_csv', {
+            const response = await fetch('https://upi-fraud-detection-664u.vercel.app/upload_csv', {
                 method: 'POST',
                 body: formData
             });
