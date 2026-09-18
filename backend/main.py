@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import joblib
 import pandas as pd
@@ -21,9 +20,8 @@ app.add_middleware(
 
 # --- Load Model & Encoders ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "..", "model.pkl")
-ENCODERS_PATH = os.path.join(BASE_DIR, "..", "encoders.pkl")
-FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
+MODEL_PATH = os.path.join(BASE_DIR, "model.pkl")
+ENCODERS_PATH = os.path.join(BASE_DIR, "encoders.pkl")
 
 model = None
 encoders = None
@@ -35,7 +33,8 @@ if os.path.exists(MODEL_PATH) and os.path.exists(ENCODERS_PATH):
 else:
     print("WARNING: Model and/or Encoders not found. Please run train_model.py first.")
 
-# --- Request Body Schema (Updated) ---
+
+# --- Request Body Schema ---
 class Transaction(BaseModel):
     transaction_type: str
     amount: float
@@ -45,42 +44,59 @@ class Transaction(BaseModel):
     device_type: str
     network_type: str
 
-# Helper to encode a single value safely
+
+# --- Helper to encode a single value safely ---
 def safe_encode(encoder, value):
     try:
         return encoder.transform([str(value)])[0]
     except ValueError:
-        # If unseen label, assign closest or a default (e.g., mode or 0)
-        # For this demo, we'll try to find 'Other' or just use the first class
-        # Ideally, handle unseens better, but 0 is a fallback
         return 0
 
-# --- Routes ---
+
+# --- Single Transaction Prediction ---
 @app.post("/predict")
 def predict_fraud(transaction: Transaction):
-    if not model or not encoders:
-        raise HTTPException(status_code=500, detail="Model not loaded.")
+
+    if model is None or encoders is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Model not loaded."
+        )
 
     try:
-        # Prepare Feature Vector
-        # Order: transaction type, amount (INR), merchant_category, sender_bank, receiver_bank, device_type, network_type
-        
         features = pd.DataFrame([{
-            'transaction type': safe_encode(encoders['transaction type'], transaction.transaction_type),
-            'amount (INR)': transaction.amount,
-            'merchant_category': safe_encode(encoders['merchant_category'], transaction.merchant_category),
-            'sender_bank': safe_encode(encoders['sender_bank'], transaction.sender_bank),
-            'receiver_bank': safe_encode(encoders['receiver_bank'], transaction.receiver_bank),
-            'device_type': safe_encode(encoders['device_type'], transaction.device_type),
-            'network_type': safe_encode(encoders['network_type'], transaction.network_type)
+            "transaction type": safe_encode(
+                encoders["transaction type"],
+                transaction.transaction_type
+            ),
+            "amount (INR)": transaction.amount,
+            "merchant_category": safe_encode(
+                encoders["merchant_category"],
+                transaction.merchant_category
+            ),
+            "sender_bank": safe_encode(
+                encoders["sender_bank"],
+                transaction.sender_bank
+            ),
+            "receiver_bank": safe_encode(
+                encoders["receiver_bank"],
+                transaction.receiver_bank
+            ),
+            "device_type": safe_encode(
+                encoders["device_type"],
+                transaction.device_type
+            ),
+            "network_type": safe_encode(
+                encoders["network_type"],
+                transaction.network_type
+            )
         }])
 
-        # Predict
         prediction = model.predict(features)[0]
         probability = model.predict_proba(features)[0][1]
 
         result = "Fraudulent" if prediction == 1 else "Legitimate"
-        
+
         return {
             "prediction": result,
             "is_fraud": int(prediction),
@@ -90,55 +106,82 @@ def predict_fraud(transaction: Transaction):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
+
+# --- CSV Upload & Batch Prediction ---
 @app.post("/upload_csv")
 async def upload_csv(file: UploadFile = File(...)):
-    if not model or not encoders:
-        raise HTTPException(status_code=500, detail="Model not loaded.")
+
+    if model is None or encoders is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Model not loaded."
+        )
 
     try:
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
-        
+
         # Clean headers
         df.columns = df.columns.str.strip()
-        
-        # Required columns for PREDICTION
-        feature_cols = [
-            'transaction type', 
-            'amount (INR)', 
-            'merchant_category', 
-            'sender_bank', 
-            'receiver_bank', 
-            'device_type', 
-            'network_type'
-        ]
-        
-        missing = [col for col in feature_cols if col not in df.columns]
-        if missing:
-             found_cols = list(df.columns)
-             raise HTTPException(
-                 status_code=400, 
-                 detail=f"CSV missing columns: {missing}. \nFound: {found_cols}"
-             )
 
-        # Preprocess & Predict
+        feature_cols = [
+            "transaction type",
+            "amount (INR)",
+            "merchant_category",
+            "sender_bank",
+            "receiver_bank",
+            "device_type",
+            "network_type"
+        ]
+
+        missing = [
+            col for col in feature_cols
+            if col not in df.columns
+        ]
+
+        if missing:
+            found_cols = list(df.columns)
+
+            raise HTTPException(
+                status_code=400,
+                detail=f"CSV missing columns: {missing}. Found: {found_cols}"
+            )
+
+        # Copy dataframe
         X = df.copy()
-        
-        # Optimize Encoding: Use map() instead of apply()
-        # Pre-compute encoder mappings for speed
-        for col in ['transaction type', 'merchant_category', 'sender_bank', 'receiver_bank', 'device_type', 'network_type']:
+
+        # Encode categorical columns
+        for col in [
+            "transaction type",
+            "merchant_category",
+            "sender_bank",
+            "receiver_bank",
+            "device_type",
+            "network_type"
+        ]:
+
             if col in encoders:
                 le = encoders[col]
-                # Create a mapping dict: {label: index}
-                mapping = {label: idx for idx, label in enumerate(le.classes_)}
-                
-                # Use map (vectorized) - much faster than apply
-                # Map unknown values to 0 (or some default)
-                X[col] = X[col].astype(str).map(mapping).fillna(0).astype(int)
 
-        # Select features in right order
+                mapping = {
+                    label: idx
+                    for idx, label in enumerate(le.classes_)
+                }
+
+                X[col] = (
+                    X[col]
+                    .astype(str)
+                    .map(mapping)
+                    .fillna(0)
+                    .astype(int)
+                )
+
+        # Select features
         X_final = X[feature_cols]
 
         # Predict
@@ -146,22 +189,40 @@ async def upload_csv(file: UploadFile = File(...)):
         probabilities = model.predict_proba(X_final)[:, 1]
 
         # Attach results
-        df['isFraud_pred'] = predictions
-        df['fraud_prob'] = probabilities
+        df["isFraud_pred"] = predictions
+        df["fraud_prob"] = probabilities
 
-        # Filter for Fraud
-        fraud_df = df[df['isFraud_pred'] == 1].copy()
-        
-        # Format for response
-        display_cols = ['transaction id', 'transaction type', 'amount (INR)', 'sender_bank', 'fraud_prob']
-        # Use available cols
-        final_display_cols = [c for c in display_cols if c in df.columns]
-        if 'fraud_prob' not in final_display_cols: final_display_cols.append('fraud_prob')
+        # Filter fraudulent transactions
+        fraud_df = df[
+            df["isFraud_pred"] == 1
+        ].copy()
 
-        frauds_list = fraud_df[final_display_cols].to_dict(orient='records')
-        
-        for f in frauds_list:
-            f['fraud_prob'] = f"{round(f['fraud_prob'] * 100, 2)}%"
+        # Columns to display
+        display_cols = [
+            "transaction id",
+            "transaction type",
+            "amount (INR)",
+            "sender_bank",
+            "fraud_prob"
+        ]
+
+        final_display_cols = [
+            col for col in display_cols
+            if col in df.columns
+        ]
+
+        if "fraud_prob" not in final_display_cols:
+            final_display_cols.append("fraud_prob")
+
+        frauds_list = fraud_df[
+            final_display_cols
+        ].to_dict(orient="records")
+
+        # Format probability
+        for fraud in frauds_list:
+            fraud["fraud_prob"] = (
+                f"{round(fraud['fraud_prob'] * 100, 2)}%"
+            )
 
         return {
             "message": "Analysis Complete",
@@ -170,14 +231,23 @@ async def upload_csv(file: UploadFile = File(...)):
             "frauds": frauds_list
         }
 
+    except HTTPException:
+        raise
+
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
 
-# Mount frontend
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing CSV: {str(e)}"
+        )
 
+
+# --- Local Development ---
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=7012)
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=7012
+    )
